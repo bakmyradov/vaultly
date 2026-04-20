@@ -35,3 +35,6 @@ pnpm-debug.log*
 
 # npm lockfile (project uses pnpm)
 package-lock.json
+
+.claude/launch.json
+.claude/settings.local.json

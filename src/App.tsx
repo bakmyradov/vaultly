@@ -4,13 +4,64 @@ import { PassCard } from './components/PassCard'
 import { PassDetail } from './components/PassDetail'
 import { AddPassModal } from './components/AddPassModal'
 import { CategoryFilter } from './components/CategoryFilter'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Search, Plus } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import type { Pass, Category } from './types'
 
 type AppView = 'vault' | 'detail' | 'fullscreen'
+type Density = 'comfortable' | 'compact'
+
+/* ── Icon helpers ─────────────────────────────────────────────────────────── */
+function IconVault() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+    </svg>
+  )
+}
+function IconPlus() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+function IconSearch() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+    </svg>
+  )
+}
+function IconSliders() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  )
+}
+function IconQr() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="5" y="5" width="3" height="3" fill="currentColor" stroke="none" />
+      <rect x="16" y="5" width="3" height="3" fill="currentColor" stroke="none" />
+      <rect x="5" y="16" width="3" height="3" fill="currentColor" stroke="none" />
+      <path d="M14 14h3v3M17 14h3M14 17v3h3M17 17h3v3" />
+    </svg>
+  )
+}
+function IconX() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  )
+}
 
 export default function App() {
   const { passes, addPass, updatePass, deletePass } = usePasses()
@@ -19,10 +70,14 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false)
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all')
   const [search, setSearch] = useState('')
+  const [density, setDensity] = useState<Density>('comfortable')
+  const [tweaksOpen, setTweaksOpen] = useState(false)
 
   const filtered = passes.filter(p => {
     const matchCat = activeCategory === 'all' || p.category === activeCategory
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase())
+    const matchSearch = !search ||
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.notes.toLowerCase().includes(search.toLowerCase())
     return matchCat && matchSearch
   })
 
@@ -53,155 +108,220 @@ export default function App() {
     try {
       document.documentElement.requestFullscreen?.()
       navigator.wakeLock?.request('screen').catch(() => {})
-    } catch {
-      // fullscreen/wakelock are best-effort
-    }
+    } catch { /* best-effort */ }
   }
 
   function exitFullscreen() {
     setView('detail')
-    try {
-      document.exitFullscreen?.()
-    } catch {
-      // ignore
-    }
+    try { document.exitFullscreen?.() } catch { /* ignore */ }
   }
 
+  /* ── Fullscreen ─────────────────────────────────────────────────────────── */
   if (view === 'fullscreen' && selectedPass) {
     return (
       <div
-        className="fixed inset-0 bg-background flex flex-col items-center justify-center z-50 cursor-pointer"
         onClick={exitFullscreen}
+        style={{
+          position: 'fixed', inset: 0, background: '#ffffff',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000, cursor: 'pointer',
+        }}
+        className="animate-v-fade-in"
       >
-        <div className="bg-white rounded-2xl p-6 shadow-2xl">
-          <img
-            src={selectedPass.qrImageUri}
-            alt={selectedPass.name}
-            className="w-64 h-64 object-contain"
-            style={{ imageRendering: 'pixelated' }}
-          />
+        <button
+          onClick={exitFullscreen}
+          style={{
+            position: 'absolute', top: 28, right: 24,
+            background: 'rgba(0,0,0,0.07)', border: 'none', borderRadius: 50,
+            width: 42, height: 42, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <IconX />
+        </button>
+        <img
+          src={selectedPass.qrImageUri}
+          alt={selectedPass.name}
+          style={{ width: 'min(78vw, 78vh)', height: 'min(78vw, 78vh)', objectFit: 'contain' }}
+        />
+        <div style={{ marginTop: 28, textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 4 }}>{selectedPass.name}</div>
         </div>
-        <p className="mt-5 text-base font-semibold text-foreground">{selectedPass.name}</p>
-        <p className="text-sm text-muted-foreground mt-2">Tap anywhere to exit</p>
+        <div style={{ position: 'absolute', bottom: 32, fontSize: 12, color: '#bbb' }}>Tap to close</div>
       </div>
     )
   }
 
+  /* ── Detail ─────────────────────────────────────────────────────────────── */
   if (view === 'detail' && selectedPass) {
     return (
-      <PassDetail
-        pass={selectedPass}
-        onClose={() => setView('vault')}
-        onDelete={handleDelete}
-        onUpdate={handleUpdate}
-        onFullscreen={handleFullscreen}
-      />
+      <div className="app-shell">
+        <PassDetail
+          pass={selectedPass}
+          onClose={() => setView('vault')}
+          onDelete={handleDelete}
+          onUpdate={handleUpdate}
+          onFullscreen={handleFullscreen}
+        />
+      </div>
     )
   }
 
+  /* ── Vault ──────────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="px-5 pt-12 pb-4 relative overflow-hidden">
-        <div
-          className="absolute -top-10 right-0 w-56 h-56 pointer-events-none opacity-[0.07]"
-          style={{ background: 'radial-gradient(circle, hsl(var(--primary)), transparent 70%)' }}
-        />
-
-        <div className="relative flex items-center justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-0.5">
-              <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="1" y="4" width="12" height="9" rx="2" stroke="white" strokeWidth="1.5" />
-                  <path
-                    d="M4 4V3a3 3 0 016 0v1"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
-              <span className="text-lg font-bold text-foreground tracking-tight">Vaultly</span>
+    <div className="app-shell">
+      {/* Header */}
+      <div style={{
+        padding: '48px 20px 16px', flexShrink: 0,
+        background: 'linear-gradient(180deg, rgba(59,158,255,0.06) 0%, transparent 100%)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 9,
+              background: 'linear-gradient(135deg, #185FA5, #3b9eff)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(59,158,255,0.4)',
+              color: '#fff',
+            }}>
+              <IconVault />
             </div>
-            <p className="text-xs text-muted-foreground pl-9">
-              {passes.length} {passes.length === 1 ? 'pass' : 'passes'} stored
-            </p>
+            <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--text-1)' }}>
+              Vaultly
+            </span>
           </div>
 
-          <Button
-            size="icon"
-            onClick={() => setShowAdd(true)}
-            className="rounded-full h-9 w-9 shadow-[0_0_16px_hsl(var(--primary)/0.4)]"
-            aria-label="Add pass"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          {/* Right: pass count + tweaks */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              background: 'rgba(59,158,255,0.12)', border: '1px solid rgba(59,158,255,0.25)',
+              borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#3b9eff',
+            }}>
+              {passes.length} {passes.length === 1 ? 'pass' : 'passes'}
+            </div>
+            <button
+              onClick={() => setTweaksOpen(o => !o)}
+              style={{
+                width: 34, height: 34, borderRadius: 9,
+                background: tweaksOpen ? 'rgba(59,158,255,0.15)' : 'var(--surface)',
+                border: `1px solid ${tweaksOpen ? 'rgba(59,158,255,0.4)' : 'var(--vborder)'}`,
+                color: tweaksOpen ? '#3b9eff' : 'var(--text-2)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.15s',
+              }}
+            >
+              <IconSliders />
+            </button>
+          </div>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
+        {/* Search */}
+        <div style={{ position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none', display: 'flex' }}>
+            <IconSearch />
+          </span>
+          <input
+            type="text"
+            placeholder="Search passes…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search passes…"
-            className="pl-9"
+            style={{
+              width: '100%', padding: '12px 14px 12px 40px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid var(--vborder-2)', borderRadius: 10,
+              color: 'var(--text-1)', fontSize: 14, outline: 'none',
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           />
         </div>
-      </header>
+      </div>
 
-      <div className="px-5 pb-3">
+      {/* Category filter */}
+      <div style={{ padding: '0 20px', flexShrink: 0 }}>
         <CategoryFilter active={activeCategory} onChange={setActiveCategory} />
       </div>
 
-      <main className="flex-1 px-4 pb-8">
+      {/* Grid */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 120px' }}>
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-5">
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                className={cn('text-muted-foreground')}
-              >
-                <rect x="2" y="7" width="20" height="15" rx="3" stroke="currentColor" strokeWidth="1.5" />
-                <path
-                  d="M7 7V5a5 5 0 0110 0v2"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-                <circle cx="12" cy="14" r="2" stroke="currentColor" strokeWidth="1.5" />
-                <path
-                  d="M12 16v2"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '72px 0', gap: 14 }}>
+            <div style={{ width: 72, height: 72, borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--vborder)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
+              <IconQr />
             </div>
-            <h2 className="text-sm font-semibold text-foreground mb-1">
-              {passes.length === 0 ? 'Your vault is empty' : 'No passes found'}
-            </h2>
-            <p className="text-xs text-muted-foreground mb-5 max-w-[180px]">
-              {passes.length === 0
-                ? 'Add your first QR pass to get started'
-                : 'Try a different search or category'}
-            </p>
-            {passes.length === 0 && (
-              <Button size="sm" onClick={() => setShowAdd(true)} className="gap-2">
-                <Plus className="h-4 w-4" /> Add First Pass
-              </Button>
-            )}
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-2)' }}>No passes found</div>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center' }}>
+              {search ? 'Try a different search term' : 'Tap + to add your first pass'}
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {filtered.map(pass => (
-              <PassCard key={pass.id} pass={pass} onClick={handlePassClick} />
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: density === 'compact' ? '1fr 1fr 1fr' : '1fr 1fr',
+            gap: 12,
+          }}>
+            {filtered.map((pass, i) => (
+              <div key={pass.id} style={{ animationDelay: `${i * 0.04}s` }}>
+                <PassCard pass={pass} onClick={handlePassClick} compact={density === 'compact'} />
+              </div>
             ))}
           </div>
         )}
-      </main>
+      </div>
+
+      {/* FAB */}
+      <button
+        onClick={() => setShowAdd(true)}
+        className="animate-fab-pulse"
+        style={{
+          position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)',
+          width: 54, height: 54, borderRadius: '50%',
+          background: 'linear-gradient(140deg, #1a70d9, #3b9eff)',
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', transition: 'transform 0.15s',
+          zIndex: 10,
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(-50%) scale(1.08)' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(-50%)' }}
+      >
+        <IconPlus />
+      </button>
+
+      {/* Tweaks panel */}
+      {tweaksOpen && (
+        <div
+          className="animate-v-fade-in"
+          style={{
+            position: 'absolute', bottom: 92, right: 16, zIndex: 20,
+            background: '#0d1528', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 16, padding: 18, width: 220,
+            boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+          }}
+        >
+          <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 14, letterSpacing: '0.02em' }}>
+            Tweaks
+          </h4>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+              Card Density
+            </label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['comfortable', 'compact'] as Density[]).map(d => (
+                <button key={d} onClick={() => setDensity(d)} style={{
+                  padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                  background: density === d ? 'rgba(59,158,255,0.15)' : 'var(--surface)',
+                  border: density === d ? '1px solid rgba(59,158,255,0.4)' : '1px solid var(--vborder)',
+                  color: density === d ? '#3b9eff' : 'var(--text-2)',
+                  cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.12s',
+                }}>
+                  {d === 'comfortable' ? '2-col' : '3-col'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAdd && <AddPassModal onSave={handleAddSave} onClose={() => setShowAdd(false)} />}
     </div>
